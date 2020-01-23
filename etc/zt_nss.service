@@ -1,0 +1,11 @@
+[Unit]
+Description=NSS Server Zerotier 
+After=multi-user.target
+
+[Service]
+Type=simple
+PIDFile=/run/zt_nss.pid
+ExecStart=/usr/sbin/zt_nss
+
+[Install]
+WantedBy=multi-user.target

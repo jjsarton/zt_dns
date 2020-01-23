@@ -1,0 +1,11 @@
+[Unit]
+Description=Unbound Zerotier DNS configuration
+After=multi-user.target
+
+[Service]
+Type=simple
+PIDFile=/run/zt_dns.pid
+ExecStart=/usr/sbin/zt_dns
+
+[Install]
+WantedBy=multi-user.target
