@@ -1,18 +1,28 @@
+#!/bin/sh
+unset T
+#T="echo"
+
+OS=`utils/detect.sh`
+if [ $OS != "Linux" ]
+then
+	echo "Your system don't support zt_nss"
+	exit 1
+fi
 if grep '<' etc/zt_nss.conf > /dev/null
 then
 	echo Please edit first the file etc/zt_dns.conf
 	exit 1
 fi
-cp zt_nss /usr/sbin/
+$T cp zt_nss /usr/sbin/
 
 if [ -d /usr/lib64 ]
 then
-	cp libnss_zt.so.2 /usr/lib64/libnss_zt.so.2
+	$T cp libnss_zt.so.2 /usr/lib64/libnss_zt.so.2
 else
-	cp libnss_zt.so.2 /usr/lib/libnss_zt.so.2
-fi
-cp  etc/zt_nss.service /etc/sysstemd/system
-cp  etc/zt_nss.conf /etc/
-systemctl daemon-reload
-systemctl enable zt_nss
-systemctl start zt_nss
+	$T cp libnss_zt.so.2 /usr/lib/libnss_zt.so.2
+fi 
+$T cp  etc/zt_nss.service /etc/sysstemd/system
+$T cp  etc/zt_nss.conf /etc/
+$T systemctl daemon-reload
+$T systemctl enable zt_nss
+$T systemctl start zt_nss

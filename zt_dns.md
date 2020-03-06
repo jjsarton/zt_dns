@@ -5,11 +5,14 @@ The zerotier VPN network don't offer a resolver and a connection must be done by
 * A reverse resolution is not available. 
 <br>
 May be nice.
+
 * The domain name is branded within the software.
 	This is not okay and I prefer to have not to type to much words (.zt is better as .domain.zt).
+	
 * The home LAN is not served.
 <br>
 This feature may be good for systems which don't allow to perform the name resolution for both LAN and Zerotier (smartphone, NAS,...)
+
 * Subdomain mostly not supported
 <br>
 I wan't this for testing web pages,...
@@ -38,33 +41,44 @@ The configuration file **/etc/zt\_dns.conf** must be filled with the values acco
 token:        <your authorisation token>
 net:          <your network id>
 refresh:      60
-zonefile:     /etc/unbound/zt-zone
+zonefile:     /etc/unbound/zones/zt-zone
 wildcards:    <empty, 0 or 1>
 domain:       <empty or for example .domain.zt or .zt>
 tmpFile:      /run/zt-zone
 nssPort:      9999
-noDNS:        <if present and set to 0 unbound is disabled>
+noDNS:        <if present and set to 1 unbound is disabled>
 ```
 
 This file contain variables which will be read from zt\_dns. The last tree entries are optionals, however I recommand to set _tmpFile:_ specially if you run zt\_dns on a Raspberry Pi.  
 
-**token:** Generate an authorisation token on your my.zerotier.com page and put it here.
+<dl>
+<dt>token:</dt>
+<dd>Generate an authorisation token on your my.zerotier.com page and put it here.</dd>
 
-**net:** This must be filled in with you network ID, see zerotier.com.
+<dt>net:</dt>
+This must be filled in with you network ID, see zerotier.com.</dd>
 
-**refresh** Number of minutes betwenn refreshing the data from your zerotier network. Default value is 60 minutes (no value assigned or declaration not present).
+<dt>refresh:</dt>
+<dd>Number of minutes betwenn refreshing the data from your zerotier network. Default value is 60 minutes (no value assigned or declaration not present).</dd>
 
-**zonefile:** This shall, normally contain /etc/unbound/zones/zt-zone. If you have a test unbound installation with a path for an other working directory you may adapt this.
+<dt>zonefile:</dt> 
+<dd>This shall, normally contain /etc/unbound/zones/zt-zone. If you have a test unbound installation with a path for an other working directory you may adapt this.</dd>
 
-**tmpFile** If not stated or no assignement the file "/etc/unbound/zones/zt-zone/" will be used. On Systems as a Raspberry Pi it will be good to avoid writing to the sd card. **/run/zt-zone** is located withn the RAM and will be mouunted on the file stated with **zonefile:**
+<dt>tmpFile:</dt>
+<dd>If not stated or no assignement the file "/etc/unbound/zones/zt-zone/" will be used directly. On Systems as a Raspberry Pi it will be good to avoid writing to the sd card. **/run/zt-zone** is located within the RAM and will be mounted on the file stated with **zonefile:**</dd>
 
-**nssPort:** allows Unix systems as Linux to get the IP and Name for the zerotier host via a nss library. This is usefull if you don't use systemd-resolved.
+<dt>nssPort:</dt>
+<dd>allows Unix systems as Linux to get the IP and Name for the zerotier host via a nss library. This is usefull if you don't use systemd-resolved.</dd>
 
-**domains:** If nothing is entered for **domain:** the FQDN (Full Qualified Domain Name )is to be set in the corresponding my.zerotier.com page (eg. host1.zt or host1.domain.zt).
+<dt>domains:</dt>
+<dd>If nothing is entered for **domain:** the FQDN (Full Qualified Domain Name )is to be set in the corresponding my.zerotier.com page (eg. host1.zt or host1.domain.zt).</dd>
 
-**wildcards** If the value '1' is assigned to **wildcards:** queries for subdomains of the systems will be answered (eg. nslookup subdomain.host1.zt return always the address of host1.zt).
+<dt>wildcards:</dt>
+<dd>If the value '1' is assigned to **wildcards:** queries for subdomains of the systems will be answered (eg. nslookup subdomain.host1.zt return always the address of host1.zt).</dd>
 
-**noDND:** 
+<dt>noDNS:</dt>
+<dd>if the value is 1 we will not use Unbound.</dd>
+</dl>
 
 ### running zt\_dns from the commanline
 
@@ -77,12 +91,18 @@ With ```zt_dns -j`` zt\_dns will print out the json file send by the my.zerotier
 
 ```
 server:
-	directory: "/etc/unbound"
+    directory: "/etc/unbound"
+    chroot: "/etc/unbound"
+    username: unbound
     interface: 0.0.0.0
     interface: ::
-    access-control: 10.147.17.0/24 allow
+    
+    access-control: 0.0.0.0/0 refuse
+    access-control: 10.147.17.0/24 refuse
     access-control: 192.168.0.0/16 allow
     access-control: 10.0.0.0/8 allow
+    access-control: 10.0.0.0/24 allow
+    access-control: 172.16.0.0/12 allow
 
     so-reuseport: yes
     do-ip6: yes
@@ -101,7 +121,13 @@ forward-zone:
 	forward-addr: 192.168.0.1@53#correct.me
 ```
 
-This is the file **/etc/unbound/unbound.conf** I use on my raspberry Pi. The zone file is created by zt_dns and will be reloaded by unbound if a new version is created.
+This is the file **/etc/unbound/unbound.conf** I use on my raspberry Pi. The zone file is created by zt\_dns and will be reloaded by unbound if a new version is created.
+
+Some value are to be adapted to the system running unbound. See also synology.md eg. qnap.md
+
+The access-control rules tell from wich address range recursion (contacting a further resolver) is denied (refuse) or allowed (allow). For this example access for public addresses is denied and for all local addresses ist allowed excepted for the zerotier Network (range 10.147.17.0/24).
+
+
 
 The name for the zerotier hosts is the full qualified domain name eg. _host1.zt_ This has the advandage, that I can append _.zt_ to the hostname and I will get the VPN addresse. If I query only _host_ the IP-Address for my lan will be discovered (forwarding to my Router).
 
@@ -109,7 +135,7 @@ An other advantage, for me, is that my router DHCP-server pass the address for t
 
 If you want to have the hosts to be member for the domain _.example.zt_ you should not name your hosts as host1.zt or host1.domain.zt. You should declare the domain wihtin _/etc/zt\_dns.conf_ (see above).
 
-## Launching zt_dns
+## Launching zt\_dns
 
 **Zt_dns** \[-c \</path/configuration-file\>\] \[-j\]
  
@@ -149,6 +175,4 @@ First ensure that the file */etc/resolv.conf* is not a link and is configured wh
 ```
 chattr +i
 ```
-
-
 

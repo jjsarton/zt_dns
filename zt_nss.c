@@ -7,23 +7,24 @@
 #include <string.h>
 #include <netdb.h>
 #include <unistd.h>
-#include <nss.h>
-#include <resolv.h>
-#include <arpa/inet.h>
 #include <unistd.h>
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <sys/un.h>
 #include <ctype.h>
 #include <libgen.h>
 #include <poll.h>
+#include <nss.h>
+#include <resolv.h>
 #include "zt_conf.h"
 #include "zt_nss.h"
 
 // declarations
 #define ZT_PORT 9999
-#define CONF_FILE "/etc/zt_nss.conf"
+#define CONF_FILE CONF_DIR"/etc/zt_nss.conf"
 #define ZT_DOMAIN "zt"
 
 // for our configurations file must be global
@@ -43,7 +44,7 @@ IP_PART
 };
 
 static int unSock;
-
+int debug = 0;
 /* create unix socket */
 static int createLocalSocket(char *me, char *socketName) {
 	if ( !me ) {
@@ -80,9 +81,8 @@ static int requestData(char *me, int port, char *ip, char *buf, int l, char ni[]
 	struct sockaddr_in rem;
 	memset(&rem,0,sizeof(struct sockaddr_in));
 	rem.sin_family = AF_INET;
-	inet_pton(AF_INET, "127.0.0.1", &rem.sin_addr);
+	inet_pton(AF_INET, ip, &rem.sin_addr);
     rem.sin_port = htons(port);	
-    
 	int sock = socket(AF_INET,SOCK_STREAM, 0);
 	if ( sock < 0 ) {
 		fprintf(stderr,"%s can't create socket: %s\n",me,strerror(errno));
@@ -95,14 +95,23 @@ static int requestData(char *me, int port, char *ip, char *buf, int l, char ni[]
 	/* send query */
 	int s = 0;
 	int pos = 0;
-	while ( pos < l ) {
-		s = write(sock, buf+pos,l-pos); 
+	int len = strlen(buf);
+	while ( pos < len ) {
+		s = write(sock, buf+pos,len-pos); 
 		if ( s > 0 ) pos += l;
 	}
+	if ( debug ) {
+		fprintf(stderr,"Query: %s\n",buf);
+	}
 	/* wait for answer */
-	int len = read(sock,ni,sz);
+	*ni = '\0';
+	len = 0;
+	len = recv(sock,ni+len,sz-len,0);
 	if ( len > -1 ) ni[len]='\0';
-
+	if ( debug ) {
+		fprintf(stderr,"Answer: %s\n",ni);
+	}
+	shutdown(sock,SHUT_RDWR);
 	close(sock);
 
 	return 1;
@@ -157,9 +166,14 @@ static void mainLoop(char *me, int unSock, int port, char *ip, char *ztDomain, c
 						requestData(me, port, ip, buf, l, ni, sizeof(ni));
 					}
 				}
-//				*ni = '\0';
 				if ( *ni ) {
-					send(asock, ni, strlen(ni),0);
+					int s = 0;
+					pos = 0;
+					l = strlen(ni);
+					while ( pos < l ) {
+						s = send(asock, ni+pos, l -pos, 0);
+						if ( s > 0 ) pos += l;
+					}
 				}
 				shutdown(asock,SHUT_RDWR);
 				close(asock);
@@ -186,11 +200,14 @@ int main(int argc, char **argv) {
 	int port = 0;
 	
 	/* process options */
-	while ((opt = getopt(argc, argv, "c:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:d")) != -1) {
 		switch(opt) {
 			case 'c':
 				confFile=optarg;
-				break;
+			break;
+			case 'd':
+				debug=1;
+			break;
 			default:
 				usage(me);
 				return 1;
